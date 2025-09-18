@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation"; // ✅ import useParams
+import { useParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -62,7 +62,9 @@ interface JobDetails {
 }
 
 export default function CandidateForm() {
-  const { jobId } = useParams<{ jobId: string }>(); // ✅ get jobId from route
+
+  // getting id form the params
+  const { jobId } = useParams<{ jobId: string }>(); 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
@@ -78,11 +80,11 @@ export default function CandidateForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const { toast } = useToast();
 
-  // =============================
-  // Fetch job details dynamically
-  // =============================
+
+
+// fetching the particular jobs
   useEffect(() => {
-    if (!jobId) return; // ✅ avoid fetch if jobId is missing
+    if (!jobId) return;
     const fetchJobDetails = async () => {
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
@@ -100,9 +102,7 @@ export default function CandidateForm() {
     fetchJobDetails();
   }, [jobId, toast]);
 
-  // =============================
-  // Validation helpers
-  // =============================
+
   const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const validatePhoneNumber = (phone: string) =>
@@ -148,9 +148,7 @@ export default function CandidateForm() {
     }
   };
 
-  // =============================
-  // Handlers
-  // =============================
+
   const handleInputChange = (
     name: keyof FormData,
     value: string | File | null
@@ -177,9 +175,8 @@ export default function CandidateForm() {
     return !Object.values(newErrors).some(Boolean);
   };
 
-  // =============================
-  // Submit
-  // =============================
+ 
+  
   const safeParse = async (res: Response) => {
     try {
       return await res.json();
@@ -188,8 +185,9 @@ export default function CandidateForm() {
     }
   };
 
+  // submit the response
   const handleSubmit = async () => {
-    if (!jobId) return; // ✅ avoid submit if jobId is missing
+    if (!jobId) return; 
     if (!validateForm()) {
       sonnerToast.error("Validation Error", {
         description: "Please fix the errors before submitting.",
@@ -267,9 +265,9 @@ export default function CandidateForm() {
   const handleNext = () => setCurrentStep(2);
   const handleBack = () => setCurrentStep(1);
 
-  // =============================
-  // Render UI
-  // =============================
+
+  //  UI
+  
   if (isSubmitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
