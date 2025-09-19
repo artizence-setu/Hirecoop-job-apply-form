@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FormStep1 } from "@/app/components/FormStep1";
 import { FormStep2 } from "@/app/components/FormStep2";
 import { toast as sonnerToast } from "sonner";
+import NotFound from "@/app/not-found";
 
 interface FormData {
   fullName: string;
@@ -39,7 +40,7 @@ interface JobDetails {
   work_mode: string;
   department: string;
   location: string;
-  salary: {
+  salary?: {
     min: number;
     max: number;
     currency: string;
@@ -47,8 +48,8 @@ interface JobDetails {
   };
   no_of_openings: number;
   job_description: string;
-  required_skills: string[];
-  preferred_skills: string[];
+  required_skills?: string[];
+  preferred_skills?: string[];
   experience_level: string;
   interview_process: string;
   application_deadline: string;
@@ -62,9 +63,9 @@ interface JobDetails {
 }
 
 export default function CandidateForm() {
+  const params = useParams();
+  const jobId = params?.jobId as string | undefined;
 
-  // getting id form the params
-  const { jobId } = useParams<{ jobId: string }>(); 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
@@ -80,16 +81,24 @@ export default function CandidateForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const { toast } = useToast();
 
+  const [notfound, setNotFound] = useState(false);
 
-
-// fetching the particular jobs
   useEffect(() => {
     if (!jobId) return;
+    console.log(jobId);
+
     const fetchJobDetails = async () => {
       try {
-        const res = await fetch(`/api/jobs/${jobId}`);
+        const res = await fetch(`/api/jobs?jobId=${jobId}`);
         const data = await res.json();
-        if (data.success) setJobDetails(data.data);
+
+
+        if (!res.ok || !data.success) {
+          setNotFound(true);
+          throw new Error(data.message || "Failed to fetch job details");
+        }
+       
+        setJobDetails(data.data.data);
       } catch (error) {
         console.error("Error fetching job details:", error);
         toast({
@@ -99,9 +108,9 @@ export default function CandidateForm() {
         });
       }
     };
+
     fetchJobDetails();
   }, [jobId, toast]);
-
 
   const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -148,7 +157,6 @@ export default function CandidateForm() {
     }
   };
 
-
   const handleInputChange = (
     name: keyof FormData,
     value: string | File | null
@@ -175,8 +183,6 @@ export default function CandidateForm() {
     return !Object.values(newErrors).some(Boolean);
   };
 
- 
-  
   const safeParse = async (res: Response) => {
     try {
       return await res.json();
@@ -185,9 +191,8 @@ export default function CandidateForm() {
     }
   };
 
-  // submit the response
   const handleSubmit = async () => {
-    if (!jobId) return; 
+    if (!jobId) return;
     if (!validateForm()) {
       sonnerToast.error("Validation Error", {
         description: "Please fix the errors before submitting.",
@@ -229,22 +234,19 @@ export default function CandidateForm() {
         cover_letter: formData.coverLetter,
       };
 
-      const applyRes = await fetch(
-        `https://testdns.artizence.com/api/v1/applications/public/${jobId}/apply`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const applyRes = await fetch(`/api/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, ...payload }),
+      });
 
       const applyData = await safeParse(applyRes);
 
-      if (!applyRes.ok) {
+      if (!applyRes.ok || !(applyData as any).success) {
         throw new Error(
           typeof applyData === "string"
             ? applyData
-            : applyData.detail || "Application failed"
+            : (applyData as any).message || "Application failed"
         );
       }
 
@@ -265,10 +267,7 @@ export default function CandidateForm() {
   const handleNext = () => setCurrentStep(2);
   const handleBack = () => setCurrentStep(1);
 
-
-  //  UI
-  
-  if (isSubmitted) {
+  if (isSubmitted && !notfound) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
         <Card className="w-full max-w-md text-center shadow-brand">
@@ -294,6 +293,10 @@ export default function CandidateForm() {
         </Card>
       </div>
     );
+  }
+
+  if (notfound) {
+    return <NotFound/>
   }
 
   return (
@@ -331,8 +334,9 @@ export default function CandidateForm() {
                     </span>
                     <span>•</span>
                     <span>
-                      {jobDetails.salary.currency} {jobDetails.salary.min} -{" "}
-                      {jobDetails.salary.max}
+                      {jobDetails.salary
+                        ? `${jobDetails.salary.currency} ${jobDetails.salary.min} - ${jobDetails.salary.max}`
+                        : "Salary not disclosed"}
                     </span>
                   </div>
                 </div>
@@ -344,6 +348,7 @@ export default function CandidateForm() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* About the Role */}
               <div>
                 <h3 className="text-lg font-semibold mb-3">About the Role</h3>
                 <p className="text-muted-foreground leading-relaxed">
@@ -351,33 +356,37 @@ export default function CandidateForm() {
                 </p>
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Required Skills</h3>
-                <ul className="text-muted-foreground space-y-2">
-                  {jobDetails.required_skills.map((skill) => (
-                    <li key={skill} className="flex items-start">
-                      <span className="w-2 h-2 bg-gradient-primary rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                      {skill}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* Preferred Skills */}
+              {Array.isArray(jobDetails.preferred_skills) &&
+                jobDetails.preferred_skills.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Preferred Skills</h3>
+                    <ul className="text-muted-foreground space-y-2">
+                      {jobDetails.preferred_skills.map((skill) => (
+                        <li key={skill} className="flex items-start">
+                          <span className="w-2 h-2 bg-gradient-secondary rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                          {skill}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-              {jobDetails.preferred_skills.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">
-                    Preferred Skills
-                  </h3>
-                  <ul className="text-muted-foreground space-y-2">
-                    {jobDetails.preferred_skills.map((skill) => (
-                      <li key={skill} className="flex items-start">
-                        <span className="w-2 h-2 bg-gradient-secondary rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                        {skill}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Required Skills */}
+              {Array.isArray(jobDetails.required_skills) &&
+                jobDetails.required_skills.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Required Skills</h3>
+                    <ul className="text-muted-foreground space-y-2">
+                      {jobDetails.required_skills.map((skill) => (
+                        <li key={skill} className="flex items-start">
+                          <span className="w-2 h-2 bg-gradient-primary rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                          {skill}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
             </CardContent>
           </Card>
         )}

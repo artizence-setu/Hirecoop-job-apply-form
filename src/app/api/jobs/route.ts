@@ -1,13 +1,18 @@
-// src/app/api/jobs/[jobId]/route.ts
-import { NextResponse } from "next/server";
+// src/app/api/jobs/route.ts
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { jobId: string } }
-) {
-  const { jobId } = params;
-
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get("jobId");
+
+    if (!jobId) {
+      return NextResponse.json(
+        { success: false, message: "jobId is required" },
+        { status: 400 }
+      );
+    }
+
     const res = await fetch(
       `https://testdns.artizence.com/api/v1/jobs/public/${jobId}/`,
       { cache: "no-store" }
@@ -21,7 +26,7 @@ export async function GET(
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Server error", error: String(error) },

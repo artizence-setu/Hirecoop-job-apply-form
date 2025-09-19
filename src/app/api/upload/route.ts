@@ -32,11 +32,14 @@ export async function POST(req: NextRequest) {
     const key = `${Date.now()}-${file.name}`;
     const arrayBuffer = await file.arrayBuffer();
 
+    // ✅ Convert ArrayBuffer -> Buffer for S3
+    const buffer = Buffer.from(arrayBuffer);
+
     await s3Client.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET_NAME,
         Key: key,
-        Body: arrayBuffer,
+        Body: buffer, // ✅ Use Buffer here
         ContentType: file.type,
       })
     );
